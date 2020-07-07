@@ -11,6 +11,8 @@ struct Opt {
     to: String,
     #[structopt(short, long)]
     force: bool,
+    #[structopt(short, long)]
+    verbose: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,13 +40,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
+    let mut count = 0;
     for path in from {
+        count += 1;
         let new_path = change_prefix(opt.from.as_ref(), opt.to.as_ref(), &path)?;
         if opt.force {
             fs::copy(&path, &new_path)?;
         }
-        println!("{}\n  -> {}", path.display(), new_path.display());
+
+        if !opt.force || opt.verbose {
+            println!("{}\n  -> {}", path.display(), new_path.display());
+        }
     }
+    println!(
+        "Copied {} {}",
+        count,
+        if count == 1 { "file" } else { "files" }
+    );
 
     Ok(())
 }
