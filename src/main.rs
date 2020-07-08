@@ -1,7 +1,7 @@
-use hashbrown::HashMap;
-use std::fs;
+use hashbrown::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
+use std::{fs, io};
 use structopt::StructOpt;
 use walkdir::{DirEntry, WalkDir};
 
@@ -41,19 +41,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let mut count = 0;
+    let mut cache = HashSet::new();
+
     for path in from {
         count += 1;
         let new_path = change_prefix(opt.from.as_ref(), opt.to.as_ref(), &path)?;
         if opt.force {
+            ensure_directories(&new_path, &mut cache)?;
             fs::copy(&path, &new_path)?;
         }
 
-        if !opt.force || opt.verbose {
+        if opt.verbose {
             println!("{}\n  -> {}", path.display(), new_path.display());
         }
     }
     println!(
-        "Copied {} {}",
+        "{} {} {}",
+        if opt.force { "Copied" } else { "Would copy " },
         count,
         if count == 1 { "file" } else { "files" }
     );
@@ -77,4 +81,18 @@ fn file_with_time(entry: DirEntry) -> Option<(PathBuf, SystemTime)> {
     } else {
         None
     }
+}
+
+fn ensure_directories<'a>(path: &'a Path, cache: &mut HashSet<PathBuf>) -> io::Result<()> {
+    let directory = if path.is_dir() {
+        path
+    } else {
+        path.parent()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Parent is root"))?
+    };
+
+    if cache.insert(path.into()) {
+        fs::create_dir_all(directory)?;
+    }
+    Ok(())
 }
