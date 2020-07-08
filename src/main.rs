@@ -44,20 +44,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cache = HashSet::new();
 
     for path in from {
-        count += 1;
-        let new_path = change_prefix(opt.from.as_ref(), opt.to.as_ref(), &path)?;
+        let (unique_path, new_path) = change_prefix(opt.from.as_ref(), opt.to.as_ref(), &path)?;
         if opt.force {
             ensure_directories(&new_path, &mut cache)?;
             fs::copy(&path, &new_path)?;
         }
-
+        
         if opt.verbose {
-            println!("{}\n  -> {}", path.display(), new_path.display());
+            println!("{}", unique_path.display());
         }
+        count += 1;
     }
+
     println!(
-        "{} {} {}",
-        if opt.force { "Copied" } else { "Would copy " },
+        "{}{} {}",
+        if opt.force { "Copied " } else { "" },
         count,
         if count == 1 { "file" } else { "files" }
     );
@@ -65,13 +66,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn change_prefix(
+fn change_prefix<'a>(
     from: &Path,
     to: &Path,
-    path: &Path,
-) -> Result<PathBuf, std::path::StripPrefixError> {
+    path: &'a Path,
+) -> Result<(&'a Path, PathBuf), std::path::StripPrefixError> {
     let path = path.strip_prefix(from)?;
-    Ok(to.join(path))
+    Ok((path, to.join(path)))
 }
 
 fn file_with_time(entry: DirEntry) -> Option<(PathBuf, SystemTime)> {
